@@ -1,6 +1,7 @@
 import {
     CreateMultipartUploadCommand,
     UploadPartCommand,
+    PutObjectCommand,
     CompleteMultipartUploadCommand,
     AbortMultipartUploadCommand,
     S3Client,
@@ -27,14 +28,16 @@ export default async function POST(req,res) {
     credentials: fromCognitoIdentityPool({
       clientConfig: { region: "eu-north-1" },
       identityPoolId: "eu-north-1:6882a53f-ea7c-49cb-b0b6-bea5052ec264",
+      
     }),
+    
   
     
   });
   const bucketName = "theprintguy-customerfiles";
   const buffer = Buffer.from(file, "utf8");
 //   console.log(buffer);
-  const key = "multipart";
+  const key = `multipart${Date.now()}`;
 
   let uploadId;
 
@@ -44,13 +47,15 @@ export default async function POST(req,res) {
         Bucket: bucketName,
         ExpectedBucketOwner:"200994887321",
         Key: key,
+        
       }),
     );
-
+// console.log(multipartUpload.UploadId);
     uploadId = multipartUpload.UploadId;
 
+ 
     const uploadPromises = [];
-    // Multipart uploads require a minimum size of 5 MB per part.
+    
     let vl=Math.ceil(buffer.toString().length/(5*1024*1024));
     console.log(vl);
     const partSize = Math.ceil(buffer.length / vl);
@@ -69,6 +74,7 @@ export default async function POST(req,res) {
               UploadId: uploadId,
               Body: buffer.subarray(start, end),
               PartNumber: i + 1,
+              
             }),
           )
           .then((d) => {
@@ -79,7 +85,18 @@ export default async function POST(req,res) {
     }
 
     const uploadResults = await Promise.all(uploadPromises);
-    console.log(uploadResults);
+    await s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucketName,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: uploadResults.map(({ ETag }, i) => ({
+            ETag,
+            PartNumber: i + 1,
+          })),
+        },
+      }));
 
     return res.json({ ok: true })
 
