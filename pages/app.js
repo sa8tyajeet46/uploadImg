@@ -1,31 +1,36 @@
 import React from 'react'
 import { useState } from 'react';
+import axios from 'axios';
 function app() {
   const [file,setFile]=useState();
   const [us,setUs]=useState("initial");
+  const [progress, setProgress] = useState(0);
+
   const handleSubmit=async(e)=>{
     e.preventDefault();
     try{
       const data = new FormData()
-      data.set('file', file);
-      setUs("progress");
-
-      const res = await fetch('/api/handleUpload', {
-        method: 'POST',
-        body: data
-      })
+       data.append('file', file);
+       setUs("progress");
+     
+      const res = await fetch('/api/mupload', {method:"POST",body:data,  onUploadProgress: (progressEvent) => {
+        const percentage = (progressEvent.loaded / progressEvent.total) * 100;
+        console.log(percentage);
+        setProgress(percentage);
+      }})
+      
       setUs("initial");
-      // console.log(res);
+
       if (!res.ok) throw new Error();
     }
     catch(e){
       setUs("failed");
-      // console.log(e);
+      console.log(e);
       throw new Error();
     }
   }
 
-  return (
+  return (<>{us==="progress"?<div>{progress}</div>:
     <div>
       <form onSubmit={(e)=>handleSubmit(e)}>
         <input type="file" onChange={(e)=>setFile(e.target.files?.[0])}></input>
@@ -33,6 +38,8 @@ function app() {
       </form>
       <div>{us}</div>
     </div>
+}
+    </>
   )
 }
 
